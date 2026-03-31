@@ -33,6 +33,3 @@ dev = [
     "pytest",
     "pytest-asyncio",
 ]
-
-[tool.uv]
-required-version = "3.14"
