@@ -25,7 +25,7 @@ Do not include any explanation. Output raw JSON only.
 def extract_triage_from_log(raw_log: str) -> AlertTriage | None:
     """Call OpenAI and map JSON output to the AlertTriage schema."""
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5.4-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Log: {raw_log}"},
