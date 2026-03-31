@@ -10,23 +10,6 @@ This project builds a **production-grade alert triage API** that ingests raw ser
 
 ---
 
-## What Changed From the Original Plan (Fix Summary)
-
-| # | Issue | Fix Applied |
-|---|---|---|
-| B1 | `choices[^1_0]` Markdown artifact breaks Python | Changed to `choices[0]` |
-| B2 | Langfuse client never initialized; `langfuse.decorators` is v2 API | Updated all imports to Langfuse Python SDK v3: `from langfuse import observe, get_client` |
-| B3 | No SQLAlchemy version pin; `with SessionLocal()` requires ≥2.0 | Pinned `sqlalchemy>=2.0` in `requirements.txt` |
-| F4 | `trace_id=None` hardcoded; trace cross-linking never worked | Capture real ID via `get_client().get_current_trace_id()` in root span |
-| F5 | `score_current_observation` attached score to child span, not root trace | Moved scoring to root `triage_pipeline` span via `langfuse.score(trace_id=...)` |
-| M6 | No Docker `healthcheck:` blocks despite docs saying to watch for "healthy" | Added `healthcheck` to postgres; `depends_on` uses `condition: service_healthy` |
-| M7 | Langfuse batch sender may not flush before process exits | Replaced deprecated `on_event` with `lifespan` context manager + `get_client().flush()` |
-| M8 | `test_triage.py` listed but never written | Added complete test file with unit + integration tests |
-| M9 | `docker.hyperdx.io` registry URL is stale; HyperDX acquired by ClickHouse (March 2025) | Updated to `hyperdx/hyperdx-all-in-one:2-nightly` (Docker Hub) |
-| M10 | Separate ClickHouse service was redundant | Removed: the HyperDX all-in-one image bundles ClickHouse internally |
-
----
-
 ## Repository Structure
 
 ```
