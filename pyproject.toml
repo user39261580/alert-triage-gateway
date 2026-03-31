@@ -33,3 +33,6 @@ dev = [
     "pytest",
     "pytest-asyncio",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["gateway"]
