@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: infra_postgres
+    environment:
+      POSTGRES_DB: infra_ops
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d infra_ops"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  hyperdx:
+    image: hyperdx/hyperdx-all-in-one:2-nightly
+    container_name: infra_hyperdx
+    ports:
+      - "8080:8080"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      __HDX_API_KEY: local-dev-key
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: infra_langfuse
+    environment:
+      DATABASE_URL: postgresql://admin:secret@postgres:5432/infra_ops
+      NEXTAUTH_SECRET: langfuse_nextauth_secret_changeme
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: langfuse_salt_changeme
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,0 +1,22 @@
+[
+  {
+    "label": "perfect_match",
+    "expected_trust_score": 1.0,
+    "raw_log": "Connection timeout on auth-service at port 5432. Severity appears CRITICAL."
+  },
+  {
+    "label": "hallucinated_service",
+    "expected_trust_score": 0.5,
+    "raw_log": "High CPU usage on fake-made-up-service. Disk IO normal. Severity LOW."
+  },
+  {
+    "label": "unparseable_noise",
+    "expected_trust_score": 0.0,
+    "raw_log": "%%%% #### ???? !!! random token stream no clear service name"
+  },
+  {
+    "label": "database_critical",
+    "expected_trust_score": 1.0,
+    "raw_log": "Fatal: user-billing-db is unreachable. All payment transactions failing."
+  }
+]

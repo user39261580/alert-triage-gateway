@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+openai
+langfuse>=3.0
+sqlalchemy>=2.0
+psycopg2-binary
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-psycopg2
+pydantic
+pydantic-settings
+httpx
+pytest
+pytest-asyncio
