@@ -8,7 +8,11 @@ from src.database import write_triage_log
 from src.evaluator import score_triage
 from src.llm_client import extract_triage_from_log
 from src.models import TriageRequest, TriageResponse
-from src.telemetry import record_triage_metrics
+from src.telemetry import (
+    record_triage_metrics,
+    record_triage_request_finished,
+    record_triage_request_started,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Triage"])
 logger = logging.getLogger("alert-triage-gateway.triage")
@@ -42,6 +46,7 @@ def _score_current_trace(langfuse_client, trust_score: float, service_valid: boo
 async def triage_alert(req: TriageRequest) -> TriageResponse:
     """Run extraction, evaluate trust, log result, and return response."""
     started_at = time.perf_counter()
+    record_triage_request_started(model=req.model)
     langfuse = get_client()
     logger.info("triage_request_started", extra={"model": req.model})
 
@@ -101,3 +106,5 @@ async def triage_alert(req: TriageRequest) -> TriageResponse:
             extra={"model": req.model, "latency_ms": round(latency_ms, 2)},
         )
         raise
+    finally:
+        record_triage_request_finished(model=req.model)

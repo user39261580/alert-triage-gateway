@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from langfuse import get_client
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-from src.telemetry import setup_otel, shutdown_otel
+from src.telemetry import record_healthcheck, setup_otel, shutdown_otel
 
 
 def _setup_observability() -> None:
@@ -34,4 +34,5 @@ app.include_router(router)
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    record_healthcheck()
     return {"status": "ok"}

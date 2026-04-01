@@ -1,6 +1,9 @@
 import logging
+import threading
+import time
 
 from opentelemetry import _logs, metrics, trace
+from opentelemetry.metrics import Observation
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -23,12 +26,30 @@ _request_counter = None
 _error_counter = None
 _latency_histogram = None
 _trust_score_histogram = None
+_inflight_counter = None
+_health_counter = None
+
+_inflight_requests = 0
+_inflight_lock = threading.Lock()
+_app_start_time = time.time()
+
+
+def _observe_uptime(_options):
+    uptime_seconds = max(0.0, time.time() - _app_start_time)
+    return [Observation(uptime_seconds)]
+
+
+def _observe_inflight_requests(_options):
+    with _inflight_lock:
+        inflight = _inflight_requests
+    return [Observation(inflight, attributes={"endpoint": "/api/v1/triage-alert"})]
 
 
 def setup_otel(service_name: str) -> None:
     """Initialize traces, logs, metrics, and DB instrumentation."""
     global _trace_provider, _meter_provider, _log_provider
     global _request_counter, _error_counter, _latency_histogram, _trust_score_histogram
+    global _inflight_counter, _health_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -57,6 +78,26 @@ def setup_otel(service_name: str) -> None:
     _trust_score_histogram = meter.create_histogram(
         name="triage_trust_score",
         description="Distribution of computed trust scores",
+    )
+    _inflight_counter = meter.create_up_down_counter(
+        name="triage_requests_inflight",
+        description="Current number of in-flight triage requests",
+    )
+    _health_counter = meter.create_counter(
+        name="healthcheck_requests_total",
+        description="Total health endpoint hits",
+    )
+
+    meter.create_observable_gauge(
+        name="app_uptime_seconds",
+        unit="s",
+        description="Application uptime in seconds",
+        callbacks=[_observe_uptime],
+    )
+    meter.create_observable_gauge(
+        name="triage_requests_inflight_gauge",
+        description="Snapshot of current in-flight triage requests",
+        callbacks=[_observe_inflight_requests],
     )
 
     _log_provider = LoggerProvider(resource=resource)
@@ -104,6 +145,44 @@ def record_triage_metrics(
 
     if trust_score is not None and _trust_score_histogram is not None:
         _trust_score_histogram.record(trust_score, {"model": model})
+
+
+def record_triage_request_started(*, model: str) -> None:
+    """Track when a triage request starts processing."""
+    global _inflight_requests
+
+    attrs = {
+        "endpoint": "/api/v1/triage-alert",
+        "model": model,
+    }
+
+    with _inflight_lock:
+        _inflight_requests += 1
+
+    if _inflight_counter is not None:
+        _inflight_counter.add(1, attrs)
+
+
+def record_triage_request_finished(*, model: str) -> None:
+    """Track when a triage request finishes processing."""
+    global _inflight_requests
+
+    attrs = {
+        "endpoint": "/api/v1/triage-alert",
+        "model": model,
+    }
+
+    with _inflight_lock:
+        _inflight_requests = max(0, _inflight_requests - 1)
+
+    if _inflight_counter is not None:
+        _inflight_counter.add(-1, attrs)
+
+
+def record_healthcheck() -> None:
+    """Track health endpoint usage."""
+    if _health_counter is not None:
+        _health_counter.add(1, {"endpoint": "/health"})
 
 
 def shutdown_otel() -> None:
