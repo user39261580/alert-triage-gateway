@@ -107,11 +107,11 @@ curl -s -X POST http://localhost:8000/api/v1/triage-alert \
 
 This is the architectural core of the project. One request generates two independent telemetry streams — both stamped with the same trace ID.
 
-| Failure mode | Where to look | What you see |
-|---|---|---|
-| **Infra is slow** (DB overloaded, network latency) | **HyperDX** (OTel) | Span waterfall — `http_handler` → `llm_call` → `db_query`, with P99 per span |
-| **LLM is hallucinating** (wrong service names, bad severity) | **Langfuse** | `trust_score` chart trending down, trace tree showing the exact prompt + output |
-| **Both happening** | Cross-reference via `langfuse_trace_id` in `triage_log` | Same request, two dashboards, instant root cause |
+| Failure mode                                                 | Where to look                                           | What you see                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Infra is slow** (DB overloaded, network latency)           | **HyperDX** (OTel)                                      | Span waterfall — `http_handler` → `llm_call` → `db_query`, with P99 per span    |
+| **LLM is hallucinating** (wrong service names, bad severity) | **Langfuse**                                            | `trust_score` chart trending down, trace tree showing the exact prompt + output |
+| **Both happening**                                           | Cross-reference via `langfuse_trace_id` in `triage_log` | Same request, two dashboards, instant root cause                                |
 
 > **The key insight:** HyperDX tells you *when* something is slow. Langfuse tells you *whether* the model can still be trusted. Without both, you're flying half-blind.
 
@@ -167,17 +167,17 @@ POST /api/v1/triage-alert
 
 ## Tech Stack
 
-| Layer | Technology | Role |
-|---|---|---|
-| API | FastAPI + Uvicorn | Async HTTP, Pydantic-native request/response validation |
-| LLM | OpenAI `gpt-4o-mini` | Structured JSON extraction from unstructured log text |
-| AI Tracing | Langfuse v3 | Prompt traces, token cost, eval scores per run |
-| System Tracing | OpenTelemetry + OTLP | Standard distributed tracing across all spans |
-| Observability UI | HyperDX | ClickHouse-backed OTel collector + UI, single Docker service |
-| Database | PostgreSQL 15 | Ground-truth service registry + immutable audit log |
-| ORM | SQLAlchemy 2.0 | Sync connection pool with context-manager session handling |
-| Infra | Docker Compose | Full stack in one command — no manual service wiring |
-| Testing | pytest + httpx | Unit tests (mocked LLM + DB) and integration tests |
+| Layer            | Technology           | Role                                                         |
+| ---------------- | -------------------- | ------------------------------------------------------------ |
+| API              | FastAPI + Uvicorn    | Async HTTP, Pydantic-native request/response validation      |
+| LLM              | OpenAI `gpt-4o-mini` | Structured JSON extraction from unstructured log text        |
+| AI Tracing       | Langfuse v3          | Prompt traces, token cost, eval scores per run               |
+| System Tracing   | OpenTelemetry + OTLP | Standard distributed tracing across all spans                |
+| Observability UI | HyperDX              | ClickHouse-backed OTel collector + UI, single Docker service |
+| Database         | PostgreSQL 15        | Ground-truth service registry + immutable audit log          |
+| ORM              | SQLAlchemy 2.0       | Sync connection pool with context-manager session handling   |
+| Infra            | Docker Compose       | Full stack in one command — no manual service wiring         |
+| Testing          | pytest + httpx       | Unit tests (mocked LLM + DB) and integration tests           |
 
 ---
 
@@ -209,7 +209,7 @@ curl -s -X POST http://localhost:8000/api/v1/triage-alert \
 
 Then open:
 - **HyperDX UI:** `http://localhost:8080`
-- **Langfuse UI:** your Langfuse project dashboard (cloud or self-hosted)
+- **Langfuse UI:** `https://us.cloud.langfuse.com/`
 
 ---
 
@@ -233,21 +233,26 @@ The API accepts an optional `model` field on every request, defaulting to `gpt-4
 python tests/compare_models.py
 ```
 
-Default model lineup: `gpt-4o-mini`, `gpt-4o`, `gpt-3.5-turbo`
+Default model lineup: `gpt-4o-mini`, `gpt-5.4-mini`, `gpt-5.4-nano`
 
 Output per run:
 
 ```
 model,label,status_code,trust_score,expected_trust_score,service_valid,latency_ms,trace_id
-gpt-4o-mini,perfect_match,200,1.0,1.0,True,843.21,550e8400-...
-gpt-4o-mini,hallucinated_service,200,0.5,0.5,False,791.44,7c9e6679-...
-gpt-4o-mini,unparseable_noise,200,0.2,0.0,False,612.88,9a3f1b2c-...
-...
+gpt-4o-mini,perfect_match,200,1.0,1.0,True,2089.3,ad9a97ed...
+gpt-4o-mini,hallucinated_service,200,0.5,0.5,False,2052.24,9053f4f7...
+gpt-4o-mini,unparseable_noise,200,0.5,0.0,False,982.63,391229a4...
+gpt-5.4-mini,perfect_match,200,1.0,1.0,True,528.77,32b9b3a4...
+gpt-5.4-mini,hallucinated_service,200,0.5,0.5,False,605.52,32247f9f...
+gpt-5.4-mini,unparseable_noise,200,0.5,0.0,False,1221.09,d10d9831...
+gpt-5.4-nano,perfect_match,200,1.0,1.0,True,859.12,9a37ade9...
+gpt-5.4-nano,hallucinated_service,200,0.5,0.5,False,601.18,ae87abf1...
+gpt-5.4-nano,unparseable_noise,200,0.5,0.0,False,515.66,b6a1ece7...
 
 Summary
-- gpt-4o-mini: runs=10  avg_trust_score=0.72  avg_latency_ms=748.3
-- gpt-4o:      runs=10  avg_trust_score=0.81  avg_latency_ms=1203.6
-- gpt-3.5-turbo: runs=10  avg_trust_score=0.63  avg_latency_ms=521.9
+- gpt-4o-mini: runs=10  avg_trust_score=0.8  avg_latency_ms=1730.35
+- gpt-5.4-mini: runs=10  avg_trust_score=0.8  avg_latency_ms=963.01
+- gpt-5.4-nano: runs=10  avg_trust_score=0.8  avg_latency_ms=776.22
 ```
 
 Use the `trace_id` column to open any individual run directly in Langfuse and inspect the exact prompt, completion, and score.
@@ -260,21 +265,18 @@ Use the `trace_id` column to open any individual run directly in Langfuse and in
 
 The test suite covers the full trust score spectrum plus real-world edge cases:
 
-| Label | Raw Log Summary | Expected Score | Tests |
-|---|---|---|---|
-| `perfect_match` | `auth-service` CRITICAL timeout | `1.0` | Valid JSON + valid severity + known service |
-| `database_critical` | `user-billing-db` unreachable | `1.0` | DB issue flagged correctly |
-| `hallucinated_service` | Plausible but fake service name | `0.5` | Model invents a service not in registry |
-| `near_miss_typo` | `autth-service` (typo) | `0.5` | Model may autocorrect to wrong canonical name |
-| `ambiguous_severity` | Intermittent 503s, unclear status | `0.5` | Tests model confidence on ambiguous input |
-| `multi_service_cascade` | Cascade across 3 known services | `1.0` | Model picks correct root cause service |
-| `structured_log_input` | Pre-formatted `[CRITICAL][user-billing-db]` log | `1.0` | Model handles structured format cleanly |
-| `misleading_healthy_log` | `auth-service` responded in 2ms, no issues | `1.0` | Severity should be LOW, service is real |
-| `unparseable_noise` | `%%%% #### ???? !!!` token noise | `0.0` | Model returns unparseable output |
-
-<!-- 📝 NOTE: Add remaining edge-case payloads to tests/sample_payloads.json
-     (near_miss_typo, ambiguous_severity, multi_service_cascade, structured_log_input,
-      misleading_healthy_log) then re-run compare_models.py to populate real results above -->
+| Label                                | Raw Log Summary                                       | Expected Score | Tests                                                      |
+| ------------------------------------ | ----------------------------------------------------- | -------------- | ---------------------------------------------------------- |
+| `perfect_match`                      | `auth-service` CRITICAL timeout                       | `1.0`          | Valid JSON + valid severity + known service                |
+| `database_critical`                  | `user-billing-db` unreachable                         | `1.0`          | DB issue flagged correctly                                 |
+| `hallucinated_service`               | Plausible but fake service name                       | `0.5`          | Model invents a service not in registry                    |
+| `typo_near_miss_service`             | `autth-service` (typo)                                | `0.5`          | Near-match name should not pass service validation         |
+| `ambiguous_severity_503`             | Intermittent 503s, unclear degraded vs down state     | `0.5`          | Tests model confidence on ambiguous severity clues         |
+| `multi_service_cascade`              | Cascade across 3 known services                       | `1.0`          | Model picks correct root cause service                     |
+| `structured_log_datadog_style`       | Pre-formatted `[CRITICAL][user-billing-db]` log       | `1.0`          | Model handles structured/SIEM style format cleanly         |
+| `misleading_noise_with_real_service` | `auth-service` responded in 2ms, no issues            | `1.0`          | Real service mention amid noisy text still scores high     |
+| `mixed_language_partial_spanish`     | Spanish/English mixed outage signal on `auth-service` | `1.0`          | Tests multilingual robustness with real service extraction |
+| `unparseable_noise`                  | `%%%% #### ???? !!!` token noise                      | `0.0`          | Model returns unparseable output                           |
 
 ---
 
@@ -292,23 +294,23 @@ The answer was a self-evaluating LLM pipeline, because every company in that clu
 
 ### Why This Stack Resonates
 
-| Company | Domain | Connection |
-|---|---|---|
-| **Okahu** | AI observability for LLM apps | Demonstrates exactly the observability layer they sell |
-| **Datawizz** | SLM training + continuous learning | Mirrors their eval loop + runtime signal philosophy |
-| **Oumi** | Automated model evaluation | Shows automated 0.0–1.0 scoring per LLM run |
-| **Exosphere** | Agent reliability manager | Structured output enforcement + run tracking |
-| **StratoCloud / Cielara** | Cloud intelligence | Service hallucination = config drift, same root problem |
-| **Actual AI / CodeIntegrity** | Agent governance | Audit log + guardrail-style evaluation |
+| Company                       | Domain                             | Connection                                              |
+| ----------------------------- | ---------------------------------- | ------------------------------------------------------- |
+| **Okahu**                     | AI observability for LLM apps      | Demonstrates exactly the observability layer they sell  |
+| **Datawizz**                  | SLM training + continuous learning | Mirrors their eval loop + runtime signal philosophy     |
+| **Oumi**                      | Automated model evaluation         | Shows automated 0.0–1.0 scoring per LLM run             |
+| **Exosphere**                 | Agent reliability manager          | Structured output enforcement + run tracking            |
+| **StratoCloud / Cielara**     | Cloud intelligence                 | Service hallucination = config drift, same root problem |
+| **Actual AI / CodeIntegrity** | Agent governance                   | Audit log + guardrail-style evaluation                  |
 
 ### AI-Assisted Development Workflow
 
-| Stage | What Happened |
-|---|---|
-| **Research** | Perplexity analyzed 50+ Summit companies, clustered by stack, ranked hiring potential |
-| **Architecture** | 3 business logic options generated and compared; Alert Triage Gateway selected as highest-resonance |
-| **Implementation** | All source files written iteratively with AI, bugs caught and fixed through dialogue |
-| **Debugging** | 10 bugs resolved collaboratively: Langfuse v3 imports, OTel endpoint format, SQLAlchemy 2.0 session handling, Docker healthchecks |
+| Stage              | What Happened                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Research**       | Perplexity analyzed 50+ Summit companies, clustered by stack, ranked hiring potential                                             |
+| **Architecture**   | 3 business logic options generated and compared; Alert Triage Gateway selected as highest-resonance                               |
+| **Implementation** | All source files written iteratively with AI, bugs caught and fixed through dialogue                                              |
+| **Debugging**      | 10 bugs resolved collaboratively: Langfuse v3 imports, OTel endpoint format, SQLAlchemy 2.0 session handling, Docker healthchecks |
 
 ---
 
