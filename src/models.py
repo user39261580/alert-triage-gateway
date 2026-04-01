@@ -10,6 +10,12 @@ class TriageRequest(BaseModel):
         max_length=2000,
         description="Raw alert/error log text to triage",
     )
+    model: str = Field(
+        default="gpt-4o-mini",
+        min_length=1,
+        max_length=128,
+        description="LLM model name used for extraction",
+    )
 
 
 class AlertTriage(BaseModel):

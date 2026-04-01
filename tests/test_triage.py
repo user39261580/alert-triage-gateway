@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.models import AlertTriage
+from src.models import AlertTriage, TriageRequest
 from src.evaluator import score_triage
 
 
@@ -45,6 +45,16 @@ class TestScoreTriage:
             score, valid = score_triage(triage)
             assert score == 1.0
             assert valid is True
+
+
+class TestTriageRequest:
+    def test_model_defaults_to_gpt_4o_mini(self):
+        req = TriageRequest(raw_log="Connection timeout on auth-service")
+        assert req.model == "gpt-4o-mini"
+
+    def test_model_can_be_overridden(self):
+        req = TriageRequest(raw_log="Connection timeout on auth-service", model="gpt-5.4-mini")
+        assert req.model == "gpt-5.4-mini"
 
 
 @pytest.mark.integration

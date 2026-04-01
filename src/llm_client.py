@@ -21,11 +21,11 @@ Do not include any explanation. Output raw JSON only.
 """
 
 
-@observe(name="llm_extraction")
-def extract_triage_from_log(raw_log: str) -> AlertTriage | None:
+@observe(name="llm_extraction", as_type="generation")
+def extract_triage_from_log(raw_log: str, model: str = "gpt-4o-mini") -> AlertTriage | None:
     """Call OpenAI and map JSON output to the AlertTriage schema."""
     response = openai_client.chat.completions.create(
-        model="gpt-5.4-mini",
+        model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Log: {raw_log}"},
@@ -33,6 +33,13 @@ def extract_triage_from_log(raw_log: str) -> AlertTriage | None:
         temperature=0,
         response_format={"type": "json_object"},
     )
+
+    if hasattr(langfuse_client, "update_current_generation"):
+        langfuse_client.update_current_generation(
+            model=model,
+            model_parameters={"temperature": 0},
+            metadata={"requested_model": model},
+        )
 
     raw_json = response.choices[0].message.content or "{}"
 
