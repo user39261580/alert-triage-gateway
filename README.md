@@ -119,21 +119,15 @@ This is the architectural core of the project. One request generates two indepen
 
 *Every request produces a 3-span waterfall: HTTP handler wraps the LLM call, which is sibling to the DB lookup. Slow DB ≠ bad model. You can now tell them apart.*
 
-<!-- 📸 INSERT SCREENSHOT: HyperDX span waterfall showing the 3-span hierarchy:
-     http_handler (total) → llm_extraction (child) + db_lookup (child)
-     Ideal: show one request where LLM latency is visibly the bottleneck -->
+![HyperDX span waterfall](images/HyperDX%20span%20waterfall.png)
 
 ### Langfuse — AI Trace Tree + Trust Scores
 
 *Every LLM call is traced with its full prompt, raw output, token count, and the computed trust score pushed as a named Score. Filter by `requested_model` metadata to compare models side by side.*
 
-<!-- 📸 INSERT SCREENSHOT: Langfuse trace tree showing:
-     triage_pipeline (root) → llm_extraction (generation) → evaluation_scorer
-     With the trust_score visible as a Score on the root trace -->
+![Langfuse trace tree](images/Langfuse%20trace%20tree.png)
 
-<!-- 📸 INSERT SCREENSHOT: Langfuse Scores Chart
-     Show trust_score distribution across multiple runs / payload types
-     Ideal: visible spread between 0.0, 0.5, 1.0 scores across different payloads -->
+![Langfuse scores chart](images/Langfuse%20Scores%20chart.png)
 
 ---
 
@@ -257,9 +251,8 @@ Summary
 
 Use the `trace_id` column to open any individual run directly in Langfuse and inspect the exact prompt, completion, and score.
 
-<!-- 📸 INSERT SCREENSHOT (optional / if you run it): compare_models.py terminal output
-     OR a Langfuse dashboard filtered by model showing avg trust_score per model
-     This section is compelling even as text-only if no screenshot is available -->
+![Multi-model comparison output](images/Multi-Model%20section.png)
+![Multi-model cost comparison](images/Model%20Cost.png)
 
 ### Payload Coverage
 
