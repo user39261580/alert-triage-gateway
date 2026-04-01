@@ -12,11 +12,35 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d infra_ops"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alert-triage-gateway
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://hyperdx:4318
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hyperdx:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   hyperdx:
     image: hyperdx/hyperdx-all-in-one:2.0.1
@@ -27,21 +51,13 @@ services:
       - "4318:4318"
     environment:
       __HDX_API_KEY: ${HDX_API_KEY}
-
-  langfuse:
-    image: langfuse/langfuse:2
-    container_name: infra_langfuse
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=${LANGFUSE_DB_SCHEMA}
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL}
-      SALT: ${LANGFUSE_SALT}
-      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
-    ports:
-      - "3000:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
+      HYPERDX_API_KEY: ${HDX_API_KEY}
+      OTEL_EXPORTER_OTLP_HEADERS: authorization=${HDX_API_KEY}
+    volumes:
+      - hyperdx_mongo_data:/data/db
+      - hyperdx_clickhouse_data:/var/lib/clickhouse
 
 volumes:
   postgres_data:
+  hyperdx_mongo_data:
+  hyperdx_clickhouse_data:

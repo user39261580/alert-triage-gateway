@@ -1,3 +1,6 @@
+import logging
+import time
+
 from fastapi import APIRouter, HTTPException
 from langfuse import get_client, observe
 
@@ -5,8 +8,10 @@ from src.database import write_triage_log
 from src.evaluator import score_triage
 from src.llm_client import extract_triage_from_log
 from src.models import TriageRequest, TriageResponse
+from src.telemetry import record_triage_metrics
 
 router = APIRouter(prefix="/api/v1", tags=["Triage"])
+logger = logging.getLogger("alert-triage-gateway.triage")
 
 
 def _score_current_trace(langfuse_client, trust_score: float, service_valid: bool) -> None:
@@ -36,26 +41,63 @@ def _score_current_trace(langfuse_client, trust_score: float, service_valid: boo
 @observe(name="triage_pipeline")
 async def triage_alert(req: TriageRequest) -> TriageResponse:
     """Run extraction, evaluate trust, log result, and return response."""
+    started_at = time.perf_counter()
     langfuse = get_client()
+    logger.info("triage_request_started", extra={"model": req.model})
 
-    if hasattr(langfuse, "update_current_span"):
-        langfuse.update_current_span(metadata={"requested_model": req.model})
+    try:
+        if hasattr(langfuse, "update_current_span"):
+            langfuse.update_current_span(metadata={"requested_model": req.model})
 
-    triage = extract_triage_from_log(req.raw_log, model=req.model)
-    if triage is None:
-        raise HTTPException(status_code=422, detail="LLM failed to produce valid JSON")
+        triage = extract_triage_from_log(req.raw_log, model=req.model)
+        if triage is None:
+            latency_ms = (time.perf_counter() - started_at) * 1000
+            record_triage_metrics(model=req.model, status="unprocessable", latency_ms=latency_ms)
+            logger.warning(
+                "triage_request_unprocessable",
+                extra={"model": req.model, "latency_ms": round(latency_ms, 2)},
+            )
+            raise HTTPException(status_code=422, detail="LLM failed to produce valid JSON")
 
-    trust_score, service_valid = score_triage(triage)
+        trust_score, service_valid = score_triage(triage)
 
-    _score_current_trace(langfuse, trust_score, service_valid)
+        _score_current_trace(langfuse, trust_score, service_valid)
 
-    trace_id = langfuse.get_current_trace_id()
+        trace_id = langfuse.get_current_trace_id()
 
-    write_triage_log(req.raw_log, triage, trust_score, trace_id)
+        write_triage_log(req.raw_log, triage, trust_score, trace_id)
 
-    return TriageResponse(
-        triage=triage,
-        trust_score=trust_score,
-        service_valid=service_valid,
-        langfuse_trace_id=trace_id,
-    )
+        latency_ms = (time.perf_counter() - started_at) * 1000
+        record_triage_metrics(
+            model=req.model,
+            status="ok",
+            latency_ms=latency_ms,
+            trust_score=trust_score,
+        )
+        logger.info(
+            "triage_request_completed",
+            extra={
+                "model": req.model,
+                "latency_ms": round(latency_ms, 2),
+                "trust_score": trust_score,
+                "service_valid": service_valid,
+                "trace_id": trace_id,
+            },
+        )
+
+        return TriageResponse(
+            triage=triage,
+            trust_score=trust_score,
+            service_valid=service_valid,
+            langfuse_trace_id=trace_id,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        latency_ms = (time.perf_counter() - started_at) * 1000
+        record_triage_metrics(model=req.model, status="error", latency_ms=latency_ms)
+        logger.exception(
+            "triage_request_failed",
+            extra={"model": req.model, "latency_ms": round(latency_ms, 2)},
+        )
+        raise
