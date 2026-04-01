@@ -1,22 +1,52 @@
 [
-  {
-    "label": "perfect_match",
-    "expected_trust_score": 1.0,
-    "raw_log": "Connection timeout on auth-service at port 5432. Severity appears CRITICAL."
-  },
-  {
-    "label": "hallucinated_service",
-    "expected_trust_score": 0.5,
-    "raw_log": "High CPU usage on fake-made-up-service. Disk IO normal. Severity LOW."
-  },
-  {
-    "label": "unparseable_noise",
-    "expected_trust_score": 0.0,
-    "raw_log": "%%%% #### ???? !!! random token stream no clear service name"
-  },
-  {
-    "label": "database_critical",
-    "expected_trust_score": 1.0,
-    "raw_log": "Fatal: user-billing-db is unreachable. All payment transactions failing."
-  }
+    {
+        "label": "perfect_match",
+        "expected_trust_score": 1.0,
+        "raw_log": "Connection timeout on auth-service at port 5432. Severity appears CRITICAL."
+    },
+    {
+        "label": "hallucinated_service",
+        "expected_trust_score": 0.5,
+        "raw_log": "High CPU usage on fake-made-up-service. Disk IO normal. Severity LOW."
+    },
+    {
+        "label": "unparseable_noise",
+        "expected_trust_score": 0.0,
+        "raw_log": "%%%% #### ???? !!! random token stream no clear service name"
+    },
+    {
+        "label": "database_critical",
+        "expected_trust_score": 1.0,
+        "raw_log": "Fatal: user-billing-db is unreachable. All payment transactions failing."
+    },
+    {
+        "label": "ambiguous_severity_503",
+        "expected_trust_score": 0.5,
+        "raw_log": "Gateway intermittently returning 503s, unclear if degraded or down."
+    },
+    {
+        "label": "multi_service_cascade",
+        "expected_trust_score": 1.0,
+        "raw_log": "Cascade: auth-service called payment-gateway called user-billing-db, all timing out."
+    },
+    {
+        "label": "structured_log_datadog_style",
+        "expected_trust_score": 1.0,
+        "raw_log": "[CRITICAL][user-billing-db] OOMKilled on pod billing-worker-7f4d"
+    },
+    {
+        "label": "misleading_noise_with_real_service",
+        "expected_trust_score": 1.0,
+        "raw_log": "Everything is fine! auth-service responded in 2ms. No issues."
+    },
+    {
+        "label": "mixed_language_partial_spanish",
+        "expected_trust_score": 1.0,
+        "raw_log": "Alerta: auth-service no responde, connection timeout on login endpoint. Impacto alto."
+    },
+    {
+        "label": "typo_near_miss_service",
+        "expected_trust_score": 0.5,
+        "raw_log": "CRITICAL: autth-service down, retry budget exhausted."
+    }
 ]
