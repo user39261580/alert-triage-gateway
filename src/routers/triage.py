@@ -3,6 +3,7 @@ import time
 
 from fastapi import APIRouter, HTTPException
 from langfuse import get_client, observe
+from opentelemetry import trace
 
 from src.database import write_triage_log
 from src.evaluator import score_triage
@@ -16,6 +17,7 @@ from src.telemetry import (
 
 router = APIRouter(prefix="/api/v1", tags=["Triage"])
 logger = logging.getLogger("alert-triage-gateway.triage")
+tracer = trace.get_tracer("alert-triage-gateway")
 
 
 def _score_current_trace(langfuse_client, trust_score: float, service_valid: bool) -> None:
@@ -70,7 +72,10 @@ async def triage_alert(req: TriageRequest) -> TriageResponse:
 
         trace_id = langfuse.get_current_trace_id()
 
-        write_triage_log(req.raw_log, triage, trust_score, trace_id)
+        with tracer.start_as_current_span("db_lookup") as db_span:
+            db_span.set_attribute("db.operation", "write_triage_log")
+            db_span.set_attribute("db.system", "postgresql")
+            write_triage_log(req.raw_log, triage, trust_score, trace_id)
 
         latency_ms = (time.perf_counter() - started_at) * 1000
         record_triage_metrics(
