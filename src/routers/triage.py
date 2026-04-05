@@ -45,7 +45,7 @@ def _score_current_trace(langfuse_client, trust_score: float, service_valid: boo
 
 @router.post("/triage-alert", response_model=TriageResponse)
 @observe(name="triage_pipeline")
-async def triage_alert(req: TriageRequest) -> TriageResponse:
+def triage_alert(req: TriageRequest) -> TriageResponse:
     """Run extraction, evaluate trust, log result, and return response."""
     started_at = time.perf_counter()
     record_triage_request_started(model=req.model)
