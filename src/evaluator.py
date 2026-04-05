@@ -1,4 +1,5 @@
 from langfuse import observe
+from sqlalchemy.orm import Session
 
 from src.database import check_service_exists
 from src.models import AlertTriage
@@ -7,7 +8,7 @@ VALID_SEVERITIES = {"LOW", "MEDIUM", "CRITICAL"}
 
 
 @observe(name="evaluation_scorer")
-def score_triage(triage: AlertTriage | None) -> tuple[float, bool]:
+def score_triage(triage: AlertTriage | None, session: Session) -> tuple[float, bool]:
     """Score the triage result and verify service_name against PostgreSQL."""
     if triage is None:
         return 0.0, False
@@ -17,7 +18,7 @@ def score_triage(triage: AlertTriage | None) -> tuple[float, bool]:
     if triage.severity_level in VALID_SEVERITIES:
         score += 0.3
 
-    service_valid = check_service_exists(triage.service_name)
+    service_valid = check_service_exists(session=session, service_name=triage.service_name)
     if service_valid:
         score += 0.5
 
