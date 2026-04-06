@@ -151,12 +151,6 @@
                 {
                     "name": "HYPERDX_API_KEY",
                     "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:hyperdx-api-key-XXXXXX"
-                }
-            ],
-            "secrets": [
-                {
-                    "name": "HYPERDX_API_KEY",
-                    "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:hyperdx-api-key-XXXXXX"
                 },
                 {
                     "name": "OTEL_EXPORTER_OTLP_HEADERS",
