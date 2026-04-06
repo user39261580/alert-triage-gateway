@@ -1,11 +1,13 @@
 import logging
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from langfuse import get_client, observe
 from opentelemetry import trace
+from sqlalchemy.orm import Session
 
-from src.database import write_triage_log
+from src.database import get_db, write_triage_log
 from src.evaluator import score_triage
 from src.llm_client import extract_triage_from_log
 from src.models import TriageRequest, TriageResponse
@@ -18,6 +20,7 @@ from src.telemetry import (
 router = APIRouter(prefix="/api/v1", tags=["Triage"])
 logger = logging.getLogger("alert-triage-gateway.triage")
 tracer = trace.get_tracer("alert-triage-gateway")
+DbSessionDep = Annotated[Session, Depends(get_db)]
 
 
 def _score_current_trace(langfuse_client, trust_score: float, service_valid: bool) -> None:
@@ -43,9 +46,9 @@ def _score_current_trace(langfuse_client, trust_score: float, service_valid: boo
         )
 
 
-@router.post("/triage-alert", response_model=TriageResponse)
+@router.post("/triage-alert")
 @observe(name="triage_pipeline")
-async def triage_alert(req: TriageRequest) -> TriageResponse:
+def triage_alert(req: TriageRequest, db: DbSessionDep) -> TriageResponse:
     """Run extraction, evaluate trust, log result, and return response."""
     started_at = time.perf_counter()
     record_triage_request_started(model=req.model)
@@ -66,7 +69,7 @@ async def triage_alert(req: TriageRequest) -> TriageResponse:
             )
             raise HTTPException(status_code=422, detail="LLM failed to produce valid JSON")
 
-        trust_score, service_valid = score_triage(triage)
+        trust_score, service_valid = score_triage(triage, db)
 
         _score_current_trace(langfuse, trust_score, service_valid)
 
@@ -75,7 +78,7 @@ async def triage_alert(req: TriageRequest) -> TriageResponse:
         with tracer.start_as_current_span("db_lookup") as db_span:
             db_span.set_attribute("db.operation", "write_triage_log")
             db_span.set_attribute("db.system", "postgresql")
-            write_triage_log(req.raw_log, triage, trust_score, trace_id)
+            write_triage_log(db, req.raw_log, triage, trust_score, trace_id)
 
         latency_ms = (time.perf_counter() - started_at) * 1000
         record_triage_metrics(

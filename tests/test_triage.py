@@ -8,7 +8,7 @@ from src.evaluator import score_triage
 
 class TestScoreTriage:
     def test_none_input_returns_zero(self):
-        score, valid = score_triage(None)
+        score, valid = score_triage(None, session=object())
         assert score == 0.0
         assert valid is False
 
@@ -19,7 +19,7 @@ class TestScoreTriage:
             severity_level="CRITICAL",
             is_database_issue=True,
         )
-        score, valid = score_triage(triage)
+        score, valid = score_triage(triage, session=object())
         assert score == 1.0
         assert valid is True
 
@@ -30,7 +30,7 @@ class TestScoreTriage:
             severity_level="LOW",
             is_database_issue=False,
         )
-        score, valid = score_triage(triage)
+        score, valid = score_triage(triage, session=object())
         assert score == 0.5
         assert valid is False
 
@@ -42,7 +42,7 @@ class TestScoreTriage:
                 severity_level=severity,
                 is_database_issue=False,
             )
-            score, valid = score_triage(triage)
+            score, valid = score_triage(triage, session=object())
             assert score == 1.0
             assert valid is True
 
