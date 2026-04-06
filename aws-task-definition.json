@@ -1,0 +1,202 @@
+{
+  "family": "alert-triage-gateway-stack",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/alert-triage-gateway:latest",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "dependsOn": [
+        {
+          "containerName": "postgres",
+          "condition": "HEALTHY"
+        },
+        {
+          "containerName": "hyperdx",
+          "condition": "START"
+        }
+      ],
+      "environment": [
+        {
+          "name": "LANGFUSE_HOST",
+          "value": "https://us.cloud.langfuse.com"
+        },
+        {
+          "name": "OTEL_SERVICE_NAME",
+          "value": "alert-triage-gateway"
+        },
+        {
+          "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+          "value": "http://localhost:4318"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:alert-triage-gateway-db-url-XXXXXX"
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:openai-api-key-XXXXXX"
+        },
+        {
+          "name": "LANGFUSE_PUBLIC_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:langfuse-public-key-XXXXXX"
+        },
+        {
+          "name": "LANGFUSE_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:langfuse-secret-key-XXXXXX"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/alert-triage-gateway",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    },
+    {
+      "name": "postgres",
+      "image": "postgres:15.14-alpine",
+      "portMappings": [
+        {
+          "containerPort": 5432,
+          "hostPort": 5432,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "POSTGRES_DB",
+          "value": "infra_ops"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "POSTGRES_USER",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:postgres-user-XXXXXX"
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:postgres-password-XXXXXX"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1"
+        ],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 5
+      },
+      "mountPoints": [
+        {
+          "sourceVolume": "postgres_data",
+          "containerPath": "/var/lib/postgresql/data",
+          "readOnly": false
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/alert-triage-gateway",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "postgres"
+        }
+      }
+    },
+    {
+      "name": "hyperdx",
+      "image": "hyperdx/hyperdx-all-in-one:2.0.1",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        },
+        {
+          "containerPort": 4317,
+          "hostPort": 4317,
+          "protocol": "tcp"
+        },
+        {
+          "containerPort": 4318,
+          "hostPort": 4318,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": false,
+      "secrets": [
+        {
+          "name": "HYPERDX_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:hyperdx-api-key-XXXXXX"
+        }
+      ],
+      "environment": [
+        {
+          "name": "OTEL_EXPORTER_OTLP_HEADERS",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:hyperdx-otlp-header-XXXXXX"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "hyperdx_mongo_data",
+          "containerPath": "/data/db",
+          "readOnly": false
+        },
+        {
+          "sourceVolume": "hyperdx_clickhouse_data",
+          "containerPath": "/var/lib/clickhouse",
+          "readOnly": false
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/alert-triage-gateway",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "hyperdx"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "4096",
+  "volumes": [
+    {
+      "name": "postgres_data"
+    },
+    {
+      "name": "hyperdx_mongo_data"
+    },
+    {
+      "name": "hyperdx_clickhouse_data"
+    }
+  ],
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/alert-triage-gateway-task-role"
+}
